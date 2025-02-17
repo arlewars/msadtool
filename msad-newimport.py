@@ -4,6 +4,8 @@ import pandas as pd
 from ms_active_directory.core.ad_domain import ADDomain, Credentials
 from ms_active_directory.core.ad_connection_settings import ADDomainConnectionSettings, SSLConfiguration
 
+DEBUG = True
+
 NORD_STYLES = {
     "standard": {
         "background": "#2C2C2E",
@@ -111,6 +113,9 @@ class ADApp:
         username = self.user_entry.get()
         password = self.pass_entry.get()
 
+        if DEBUG:
+            print(f"Querying AD with domain: {domain}, username: {username}")
+
         credentials = Credentials(username, password)
         connection_settings = ADDomainConnectionSettings(
             ssl_configuration=SSLConfiguration(trust_all_certificates=True),
@@ -120,22 +125,34 @@ class ADApp:
 
         if self.option_var.get() == "User":
             user_name = tk.simpledialog.askstring("Query User", "Enter User Name:")
+            if DEBUG:
+                print(f"Querying user: {user_name}")
             user = ad_domain.get_user(user_name)
+            if DEBUG:
+                print(f"User info: {user}")
             self.display_user_info(user)
         elif self.option_var.get() == "Group":
             group_name = tk.simpledialog.askstring("Query Group", "Enter Group Name:")
+            if DEBUG:
+                print(f"Querying group: {group_name}")
             group = ad_domain.get_group(group_name)
+            if DEBUG:
+                print(f"Group info: {group}")
             self.display_group_info(group)
 
     def display_user_info(self, user):
         self.users.append(user)
         info = f"User: {user.name}\nGroups: {', '.join(user.get_member_of_group_names())}"
+        if DEBUG:
+            print(f"Displaying user info: {info}")
         label = tk.Label(self.frame1, text=info, justify="left", bg=self.theme["background"], fg=self.theme["foreground"])
         label.pack()
 
     def display_group_info(self, group):
         self.groups.append(group)
         info = f"Group: {group.name}\nMembers: {', '.join(group.get_member_names())}"
+        if DEBUG:
+            print(f"Displaying group info: {info}")
         label = tk.Label(self.frame1, text=info, justify="left", bg=self.theme["background"], fg=self.theme["foreground"])
         label.pack()
 
@@ -145,6 +162,9 @@ class ADApp:
         username = self.user_entry.get()
         password = self.pass_entry.get()
 
+        if DEBUG:
+            print(f"Adding user: {user_name} to domain: {domain} with username: {username}")
+
         credentials = Credentials(username, password)
         connection_settings = ADDomainConnectionSettings(
             ssl_configuration=SSLConfiguration(trust_all_certificates=True),
@@ -152,6 +172,8 @@ class ADApp:
         )
         ad_domain = ADDomain(domain, credentials, connection_settings=connection_settings)
         user = ad_domain.get_user(user_name)
+        if DEBUG:
+            print(f"User info: {user}")
         self.display_user_info(user)
 
     def compare_users(self):
@@ -168,6 +190,9 @@ class ADApp:
 
         info = f"Groups only in {user1.name}: {', '.join(only_in_user1)}\n"
         info += f"Groups only in {user2.name}: {', '.join(only_in_user2)}"
+
+        if DEBUG:
+            print(f"Comparison info: {info}")
 
         label = tk.Label(self.frame2, text=info, justify="left", bg=self.theme["background"], fg=self.theme["foreground"])
         label.pack()
@@ -191,6 +216,9 @@ class ADApp:
 
         df = pd.DataFrame(dict([(k, pd.Series(v)) for k, v in data.items()]))
         df.to_csv("comparison.csv", index=False)
+
+        if DEBUG:
+            print(f"Exported comparison to 'comparison.csv'")
 
         messagebox.showinfo("Export", "Comparison exported to 'comparison.csv'")
 
