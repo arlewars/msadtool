@@ -1,6 +1,8 @@
 import tkinter as tk
 from tkinter import messagebox
 import ms_active_directory
+from ms_active_directory import ADDomain
+from ldap3 import NTLM
 
 server_map = {
     'LUV': 'LUV.AD.SWACORP.COM',
@@ -38,17 +40,22 @@ def query_users():
     env = env_var.get()
 
     server = server_map[env]
+    domain = ADDomain(server)
 
     # Attempt to bind with provided credentials
-    ad = ms_active_directory.domain_controller.DomainController(server, username, password)
+#    ad = ms_active_directory.domain_controller.DomainController(server, username, password)
+    try:
+        ad = domain.create_session_as_user(username, password)
+    except Exception as e:
 
-    # If binding fails, try alternative bind paths
-    for path in bind_paths[env]:
-        try:
-            ad = ms_active_directory.domain_controller.DomainController(server, path.format(username=username), password)
-            break
-        except Exception:
-            continue
+        # If binding fails, try alternative bind paths
+        for path in bind_paths[env]:
+            try:
+    #            ad = ms_active_directory.domain_controller.DomainController(server, path.format(username=username), password)
+                ad = domain.create_session_as_user(path.format(username=username), password)
+                break
+            except Exception:
+                continue
 
     user1_data = get_user_data(user1_name, env, ad)
     user2_data = get_user_data(user2_name, env, ad)
