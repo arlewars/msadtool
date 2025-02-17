@@ -1,8 +1,9 @@
 import tkinter as tk
 from tkinter import messagebox
-import ms_active_directory
+#import ms_active_directory
 from ms_active_directory import ADDomain
 from ldap3 import NTLM
+import threading
 
 DEBUG = True
 
@@ -27,34 +28,14 @@ bind_paths = {
     ]
 }
 
-#Common Name Lookup
-#user_cn = 'John Doe'
-#users = session.find_users_by_common_name(user_cn, ['employeeID'])
-#group_dn = 'operations managers'
-#groups = session.find_groups_by_common_name(group_dn, ['gidNumber'])
-#Attribute Lookup
-#desired_employee_type = 'temporary'
-#users = session.find_users_by_attribute('employeeType', desired_employee_type, ['employeeID'])
-#desired_group_manager = 'Alice P Hacker'
-#groups = session.find_groups_by_attribute('managedBy', desired_group_manager, ['gidNumber'])
-# Generic Name Lookup
-#user_name = 'John Doe'
-#user = session.find_user_by_name(user_name, ['employeeID'])
-#group_name = 'operations managers'
-#groups = session.find_groups_by_name(group_name, ['gidNumber'])
-# SAM Lookup
-#user = session.find_user_by_sam_name('user1', ['employeeID'])
-#group = session.find_group_by_sam_name('group1', ['gidNumber'])
-
-
-def get_user_data(username, env, ad):
+def get_user_data(username, ad):
+    """Query user data from Active Directory."""
     if DEBUG:
-        print(f"Querying user data for {username} in {env}")
+        print(f"Querying user data for {username}")
     user = ad.find_user_by_name(username)
     if user:
         return user['displayName'], user['mail'], user['telephoneNumber']
-    else:
-        return None
+    return None
 
 def query_users():
     user1_name = entry_user1.get()
@@ -69,20 +50,15 @@ def query_users():
     server = server_map[env]
     domain = ADDomain(server)
 
-    # Attempt to bind with provided credentials
+    # Attempt to bind with provided credentials or fallback to alternative paths
+    ad = None
     try:
-        if DEBUG:
-            print(f"Attempting to bind with username: {username}")
         ad = domain.create_session_as_user(username, password)
     except Exception as e:
         if DEBUG:
-            print(f"Initial bind failed: {e}")
-            print("Trying alternative bind paths...")
-        # If binding fails, try alternative bind paths
+            print(f"Initial bind failed: {e}. Trying alternative bind paths...")
         for path in bind_paths[env]:
             try:
-                if DEBUG:
-                    print(f"Attempting to bind with path: {path.format(username=username)}")
                 ad = domain.create_session_as_user(path.format(username=username), password)
                 break
             except Exception as e:
@@ -90,13 +66,35 @@ def query_users():
                     print(f"Bind with path {path.format(username=username)} failed: {e}")
                 continue
 
-    user1_data = get_user_data(user1_name, env, ad)
-    user2_data = get_user_data(user2_name, env, ad)
+    if not ad:
+        messagebox.showerror("Error", "Failed to bind to Active Directory.")
+        return
 
-    if DEBUG:
-        print(f"User 1 data: {user1_data}")
-        print(f"User 2 data: {user2_data}")
+    # Use threads to query both users simultaneously
+    def query_user1():
+        nonlocal user1_data
+        user1_data = get_user_data(user1_name, ad)
 
+    def query_user2():
+        nonlocal user2_data
+        user2_data = get_user_data(user2_name, ad)
+
+    user1_data = None
+    user2_data = None
+
+    # Create threads to query the users
+    thread1 = threading.Thread(target=query_user1)
+    thread2 = threading.Thread(target=query_user2)
+
+    # Start both threads
+    thread1.start()
+    thread2.start()
+
+    # Wait for both threads to finish
+    thread1.join()
+    thread2.join()
+
+    # Update UI with results
     if user1_data and user2_data:
         result_text.set(f"User 1:\nName: {user1_data[0]}\nEmail: {user1_data[1]}\nPhone: {user1_data[2]}\n\n"
                         f"User 2:\nName: {user2_data[0]}\nEmail: {user2_data[1]}\nPhone: {user2_data[2]}")
