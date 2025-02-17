@@ -4,6 +4,8 @@ import ms_active_directory
 from ms_active_directory import ADDomain
 from ldap3 import NTLM
 
+DEBUG = True
+
 server_map = {
     'LUV': 'LUV.AD.SWACORP.COM',
     'QAAD': 'QAADLUV.SWACORP.COM',
@@ -26,6 +28,8 @@ bind_paths = {
 }
 
 def get_user_data(username, env, ad):
+    if DEBUG:
+        print(f"Querying user data for {username} in {env}")
     user = ad.find_user(username)
     if user:
         return user['displayName'], user['mail'], user['telephoneNumber']
@@ -39,26 +43,39 @@ def query_users():
     password = entry_password.get()
     env = env_var.get()
 
+    if DEBUG:
+        print(f"Configuration:\nUsername: {username}\nEnvironment: {env}\nServer: {server_map[env]}")
+
     server = server_map[env]
     domain = ADDomain(server)
 
     # Attempt to bind with provided credentials
-#    ad = ms_active_directory.domain_controller.DomainController(server, username, password)
     try:
+        if DEBUG:
+            print(f"Attempting to bind with username: {username}")
         ad = domain.create_session_as_user(username, password)
     except Exception as e:
-
+        if DEBUG:
+            print(f"Initial bind failed: {e}")
+            print("Trying alternative bind paths...")
         # If binding fails, try alternative bind paths
         for path in bind_paths[env]:
             try:
-    #            ad = ms_active_directory.domain_controller.DomainController(server, path.format(username=username), password)
+                if DEBUG:
+                    print(f"Attempting to bind with path: {path.format(username=username)}")
                 ad = domain.create_session_as_user(path.format(username=username), password)
                 break
-            except Exception:
+            except Exception as e:
+                if DEBUG:
+                    print(f"Bind with path {path.format(username=username)} failed: {e}")
                 continue
 
     user1_data = get_user_data(user1_name, env, ad)
     user2_data = get_user_data(user2_name, env, ad)
+
+    if DEBUG:
+        print(f"User 1 data: {user1_data}")
+        print(f"User 2 data: {user2_data}")
 
     if user1_data and user2_data:
         result_text.set(f"User 1:\nName: {user1_data[0]}\nEmail: {user1_data[1]}\nPhone: {user1_data[2]}\n\n"
